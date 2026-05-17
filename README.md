@@ -8,7 +8,7 @@
 export GITHUB_USERNAME=wat2344
 export GITHUB_EMAIL=pavel.khokhlov.07@inbox.ru
 alias edit=nano
-alias gsed=sed   # для macOS/Linux
+alias gsed=sed   
 cd ${GITHUB_USERNAME}/workspace
 pushd .
 source scripts/activate
