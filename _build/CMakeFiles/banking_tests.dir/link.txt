@@ -1,0 +1,1 @@
+/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/banking_tests.dir/tests/test_account.cpp.o CMakeFiles/banking_tests.dir/tests/test_transaction.cpp.o -o banking_tests  libbanking.a lib/libgtest.a lib/libgmock_main.a lib/libgmock.a lib/libgtest.a
