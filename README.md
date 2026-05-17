@@ -195,12 +195,67 @@ git push origin main
 
 В рамках домашнего задания настроена автоматическая генерация пакетов (.tar.gz, .deb, .rpm, .dmg) при создании тега, а также их публикация в релизах GitHub. Конфигурация CPack позволяет легко расширить набор пакетов.
 
+### Цель
+
+Научить систему CI (GitHub Actions) при каждом новом теге (например, v0.1.0.0, v0.1.0.1):
+
+собирать проект,
+создавать пакеты с помощью CPack (.tar.gz, .deb, .rpm)
+загружать эти пакеты в соответствующий релиз на GitHub.
 ### Результаты
 
 -Созданы пакеты .tar.gz, .deb, .rpm (и .dmg на macOS).
 -Теги v0.1.0.0 и v0.1.0.1 присутствуют в репозитории.
 -Релизы на GitHub созданы (вручную для первых двух тегов, автоматически для последующих).
 -Настроен CI (GitHub Actions), который по тегу собирает пакеты и создаёт релиз.
+
+### Реализация 
+
+#### 1. Создан файл .github/workflows/cpack.yml со следующим содержимым:
+```bash
+name: CPack
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential rpm
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Package TGZ
+        run: cd build && cpack -G TGZ
+      - name: Package DEB
+        run: cd build && cpack -G DEB
+      - name: Package RPM
+        run: cd build && cpack -G RPM
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/*.tar.gz build/*.deb build/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+#### 2. Логика работы:
+
+-Workflow запускается только при пуше тега, начинающегося с v (например, v0.1.0.0).
+-Устанавливаются необходимые пакеты (cmake, rpm для сборки .rpm).
+-Проект конфигурируется и собирается.
+-CPack генерирует пакеты форматов TGZ, DEB, RPM.
+-С помощью экшена softprops/action-gh-release создаётся релиз с тем же тегом, и все пакеты автоматически прикрепляются к нему.
+
+#### Ручное создание релизов для первых тегов:
+
+Для тегов v0.1.0.0 и v0.1.0.1 релизы были созданы вручную (через веб-интерфейс GitHub) с прикреплением собранных локально пакетов.
 
 ### Вывод
 
