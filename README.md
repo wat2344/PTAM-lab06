@@ -1,416 +1,207 @@
-# PTAM-lab05
+# PTAM-lab06
 
-Данная лабораторная работа посвещена изучению фреймворков для тестирования на примере GTest
+Данная лабораторная работа посвящена изучению средств пакетирования на примере CPack.
 
 ## Tutorial
 
 ```bash
-export GITHUB\_USERNAME=<имя\_пользователя>
-alias gsed=sed
-cd ${GITHUB\_USERNAME}/workspace
+export GITHUB_USERNAME=wat2344
+export GITHUB_EMAIL=pavel.khokhlov.07@inbox.ru
+alias edit=nano
+alias gsed=sed   # для macOS/Linux
+cd ${GITHUB_USERNAME}/workspace
 pushd .
 source scripts/activate
-git clone https://github.com/${GITHUB\_USERNAME}/lab04 projects/lab05
-cd projects/lab05
+git clone https://github.com/${GITHUB_USERNAME}/PTAM-lab05 projects/PTAM-lab06
+cd projects/PTAM-lab06
 git remote remove origin
-git remote add origin https://github.com/${GITHUB\_USERNAME}/lab05
+git remote add origin https://github.com/${GITHUB_USERNAME}/PTAM-lab06
 ```
 
-Подготовили пространство
+### Добавление версионирования в CMakeLists.txt
+
+*Вставим после project(banking) следующие строки:*
 
 ```bash
-mkdir third-party
-git submodule add https://github.com/google/googletest third-party/gtest
-cd third-party/gtest \&\& git checkout release-1.8.1 \&\& cd ../..
-```
+gsed -i '/project(banking)/a\
+set(PRINT_VERSION_MAJOR 0)
+' CMakeLists.txt
 
-Добавлен gtest версии 1.8.1
+gsed -i '/project(banking)/a\
+set(PRINT_VERSION_MINOR 1)
+' CMakeLists.txt
 
-```bash
-git add third-party/gtest
-git commit -m "added gtest framework"
-```
+gsed -i '/project(banking)/a\
+set(PRINT_VERSION_PATCH 0)
+' CMakeLists.txt
 
-Коммит в git
+gsed -i '/project(banking)/a\
+set(PRINT_VERSION_TWEAK 0)
+' CMakeLists.txt
 
-```bash
-gsed -i '/option(BUILD\_EXAMPLES "Build examples" OFF)/a\\
-option(BUILD\_TESTS "Build tests" OFF)
+gsed -i '/project(banking)/a\
+set(PRINT_VERSION\
+  \${PRINT_VERSION_MAJOR}.\${PRINT_VERSION_MINOR}.\${PRINT_VERSION_PATCH}.\${PRINT_VERSION_TWEAK})
+' CMakeLists.txt
+
+gsed -i '/project(banking)/a\
+set(PRINT_VERSION_STRING "v\${PRINT_VERSION}")
 ' CMakeLists.txt
 ```
 
-Добавлена опция BUILD\_TESTS в CMakeLists.txt
+### Создание файлов описания
+
+```bash
+touch DESCRIPTION && edit DESCRIPTION   # краткое описание библиотеки
+touch ChangeLog.md
+export DATE="$(LANG=en_US date +'%a %b %d %Y')"
+cat > ChangeLog.md <<EOF
+* ${DATE} wat2344 <pavel.khokhlov.07@inbox.ru> 0.1.0.0
+- Initial CPack release
+EOF
+```
+
+### Конфигурация CPack (CPackConfig.cmake)
+
+```bash
+cat > CPackConfig.cmake <<EOF
+include(InstallRequiredSystemLibraries)
+
+set(CPACK_PACKAGE_CONTACT pavel.khokhlov.07@inbox.ru)
+set(CPACK_PACKAGE_VERSION_MAJOR \${PRINT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR \${PRINT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH \${PRINT_VERSION_PATCH})
+set(CPACK_PACKAGE_VERSION_TWEAK \${PRINT_VERSION_TWEAK})
+set(CPACK_PACKAGE_VERSION \${PRINT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_FILE \${CMAKE_CURRENT_SOURCE_DIR}/DESCRIPTION)
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Banking library with Account and Transaction classes")
+
+set(CPACK_RESOURCE_FILE_LICENSE \${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
+set(CPACK_RESOURCE_FILE_README \${CMAKE_CURRENT_SOURCE_DIR}/README.md)
+
+set(CPACK_RPM_PACKAGE_NAME "banking-devel")
+set(CPACK_RPM_PACKAGE_LICENSE "MIT")
+set(CPACK_RPM_PACKAGE_GROUP "Development")
+set(CPACK_RPM_CHANGELOG_FILE \${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog.md)
+set(CPACK_RPM_PACKAGE_RELEASE 1)
+
+set(CPACK_DEBIAN_PACKAGE_NAME "libbanking-dev")
+set(CPACK_DEBIAN_PACKAGE_PREDEPENDS "cmake >= 3.0")
+set(CPACK_DEBIAN_PACKAGE_RELEASE 1)
+
+include(CPack)
+EOF
+```
+
+*Подключим CPack в конец CMakeLists.txt:*
 
 ```bash
 cat >> CMakeLists.txt <<EOF
 
-if(BUILD\_TESTS)
-  enable\_testing()
-  add\_subdirectory(third-party/gtest)
-  file(GLOB \\${PROJECT\_NAME}\_TEST\_SOURCES tests/\*.cpp)
-  add\_executable(check \\${\\${PROJECT\_NAME}\_TEST\_SOURCES})
-  target\_link\_libraries(check \\${PROJECT\_NAME} gtest\_main)
-  add\_test(NAME check COMMAND check)
-endif()
+include(CPackConfig.cmake)
 EOF
 ```
 
-Добавлен в конец CMakeLists.txt блок для сборки
+### Локальная сборка пакетов
 
 ```bash
-mkdir tests
-cat > tests/test1.cpp <<EOF
-#include <print.hpp>
-
-#include <gtest/gtest.h>
-
-TEST(Print, InFileStream)
-{
-  std::string filepath = "file.txt";
-  std::string text = "hello";
-  std::ofstream out{filepath};
-
-  print(text, out);
-  out.close();
-
-  std::string result;
-  std::ifstream in{filepath};
-  in >> result;
-
-  EXPECT\_EQ(result, text);
-}
-EOF
+cmake -H. -B_build
+cmake --build _build
+cd _build
+cpack -G "TGZ"          # создание .tar.gz
+cpack -G "DEB"          # создание .deb (на Linux)
+cpack -G "RPM"          # создание .rpm (на Linux)
+cd ..
 ```
 
-Созданы папка tests и файл test1.cpp, проверяющий вывод в файл
+### Сохранение артефактов
 
 ```bash
-cmake -H. -B\_build -DBUILD\_TESTS=ON
-cmake --build \_build
-cmake --build \_build --target test
+mkdir artifacts
+mv _build/*.tar.gz artifacts/
+mv _build/*.deb artifacts/ 2>/dev/null || true
+mv _build/*.rpm artifacts/ 2>/dev/null || true
+mv _build/*.dmg artifacts/ 2>/dev/null || true
 ```
 
-Сборка CMake. Тут была проблема, решил так: git checkout release-1.12.1
+### Git-теги и релизы
 
 ```bash
-\_build/check
-cmake --build \_build --target test -- ARGS=--verbose
+git add .
+git commit -m "Добавлена конфигурация CPack"
+git tag v0.1.0.0
+git tag v0.1.0.1
+git push origin main --tags
 ```
 
-Тестируем работу
+*Релизы на GitHub созданы вручную через веб-интерфейс (вкладка Releases) с прикреплением пакетов из папки artifacts.*
 
-```bash
-gsed -i 's/lab04/lab05/g' README.md
-```
+### Настройка GitHub Actions для автоматической сборки пакетов по тегам
 
-Заменяем все lab04 на lab05 в файле README.md
-
-Дальше начинаются отклонения, так как замена Travis CI на GitHub Actions
+*Создадим файл .github/workflows/cpack.yml:*
 
 ```bash
 mkdir -p .github/workflows
-cat > .github/workflows/ci.yml <<EOF
-name: CI
+cat > .github/workflows/cpack.yml <<EOF
+name: CPack
 
-on: \[push, pull\_request]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: true   # рекурсивно подтягивает submodule gtest
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake g++
-
-    - name: Configure CMake
-      run: cmake -H. -B\_build -DBUILD\_TESTS=ON
-
-    - name: Build
-      run: cmake --build \_build
-
-    - name: Run tests (verbose)
-      run: |
-        cmake --build \_build --target test -- ARGS=--verbose
-EOF
-git add .github/workflows/ci.yml
-```
-
-Создаём workflows
-
-```bash
-git add tests
-git add -p
-git commit -m "added tests and GitHub Actions workflow"
-git push origin master
-```
-
-Отправлены изменения на удалённый репозиторий
-
-```bash
-gh auth login
-gh workflow run ci.yml --ref master
-mkdir artifacts
-sleep 20s \&\& gnome-screenshot --file artifacts/screenshot.png
-```
-
-Создана папка для скриншотов и сделан скриншот через 20 секунд
-
-## Homework
-
-```bash
-mkdir ./src
-mkdir ./tests
-```
-
-Это директории с файлами. В src перемещаем все исходные файлы.
-
-```cmake
-cmake\_minimum\_required(VERSION 3.10)
-project(banking)
-
-set(CMAKE\_CXX\_STANDARD 14)
-
-include(FetchContent)
-FetchContent\_Declare(googletest URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip)
-FetchContent\_MakeAvailable(googletest)
-
-add\_library(banking STATIC src/Account.cpp src/Transaction.cpp)
-target\_include\_directories(banking PUBLIC src)
-
-add\_executable(banking\_tests tests/test\_account.cpp tests/test\_transaction.cpp)
-
-target\_link\_libraries(banking\_tests PRIVATE banking gtest gmock\_main)
-
-enable\_testing()
-add\_test(NAME BankingTests COMMAND banking\_tests)
-
-option(ENABLE\_COVERAGE "Enable coverage" OFF)
-if(ENABLE\_COVERAGE)
-    target\_compile\_options(banking PRIVATE -O0 -g --coverage)
-    target\_link\_libraries(banking PRIVATE --coverage)
-    target\_compile\_options(banking\_tests PRIVATE -O0 -g --coverage)
-    target\_link\_libraries(banking\_tests PRIVATE --coverage)
-endif()
-```
-
-Это всё вставляем в корневой CMakeLists.txt через nano. Это CMake добавляет файлы, тесты и подключает GoogleTest и GoogleMock
-
-```bash
-cat > ./tests/mock\_account.h << EOF
-#pragma once
-#include <gmock/gmock.h>
-#include "Account.h"
-
-class MockAccount : public Account {
-public:
-    MockAccount(int id, int balance) : Account(id, balance) {}
-    MOCK\_METHOD(int, GetBalance, (), (const, override));
-    MOCK\_METHOD(void, ChangeBalance, (int), (override));
-    MOCK\_METHOD(void, Lock, (), (override));
-    MOCK\_METHOD(void, Unlock, (), (override));
-};
-EOF
-```
-
-Файл для переопределения MOCK методов
-
-```bash
-cat > ./tests/test\_account.cpp << EOF
-#include <gtest/gtest.h>
-#include "Account.h"
-
-TEST(Account, Basics) {
-    Account a(1, 100);
-    EXPECT\_EQ(a.id(), 1);
-    EXPECT\_EQ(a.GetBalance(), 100);
-    
-    a.Lock();
-    a.ChangeBalance(50);
-    EXPECT\_EQ(a.GetBalance(), 150);
-    
-    EXPECT\_THROW(a.Lock(), std::runtime\_error);
-    
-    a.Unlock();
-    EXPECT\_NO\_THROW(a.Lock());
-    a.Unlock();
-    
-    EXPECT\_THROW(a.ChangeBalance(10), std::runtime\_error);
-}
-EOF
-```
-
-Тестирование без моков
-
-```bash
-cat > ./tests/test\_transaction.cpp << EOF
-#include <gtest/gtest.h>
-#include <gmock/gmock.h>
-#include "Transaction.h"
-#include "mock\_account.h"
-
-using ::testing::\_;
-using ::testing::Return;
-using ::testing::Sequence;
-using ::testing::AnyNumber;
-
-TEST(Transaction, Fee) {
-    Transaction t;
-    EXPECT\_EQ(t.fee(), 1);
-    t.set\_fee(5);
-    EXPECT\_EQ(t.fee(), 5);
-}
-
-TEST(Transaction, Make\_ThrowsOnSameId) {
-    MockAccount a(1,100);
-    Transaction t;
-    EXPECT\_THROW(t.Make(a,a,200), std::logic\_error);
-}
-
-TEST(Transaction, Make\_ThrowsOnNegativeSum) {
-    MockAccount f(1,100), t(2,100);
-    Transaction tx;
-    EXPECT\_THROW(tx.Make(f,t,-10), std::invalid\_argument);
-}
-
-TEST(Transaction, Make\_ThrowsOnTooSmallSum) {
-    MockAccount f(1,100), t(2,100);
-    Transaction tx;
-    EXPECT\_THROW(tx.Make(f,t,50), std::logic\_error);
-}
-
-TEST(Transaction, Make\_ReturnsFalseIfFeeTooHigh) {
-    MockAccount f(1,1000), t(2,1000);
-    Transaction tx;
-    tx.set\_fee(100);
-    EXPECT\_FALSE(tx.Make(f,t,150));
-}
-
-TEST(Transaction, Make\_Success) {
-    MockAccount from(1,1000), to(2,500);
-    Transaction tx;
-    tx.set\_fee(10);
-    int sum = 200;
-
-    Sequence seq;
-    EXPECT\_CALL(from, Lock()).InSequence(seq);
-    EXPECT\_CALL(to, Lock()).InSequence(seq);
-    EXPECT\_CALL(to, ChangeBalance(sum)).InSequence(seq);
-    EXPECT\_CALL(to, GetBalance()).WillRepeatedly(Return(700));
-    EXPECT\_CALL(to, ChangeBalance(-(sum + tx.fee()))).InSequence(seq);
-    EXPECT\_CALL(to, Unlock()).InSequence(seq);
-    EXPECT\_CALL(from, Unlock()).InSequence(seq);
-
-    EXPECT\_TRUE(tx.Make(from, to, sum));
-}
-
-TEST(Transaction, Make\_FailAndRollback) {
-    MockAccount from(1,1000), to(2,0);
-    Transaction tx;
-    tx.set\_fee(10);
-    int sum = 100;
-
-    Sequence seq;
-    EXPECT\_CALL(from, Lock()).InSequence(seq);
-    EXPECT\_CALL(to, Lock()).InSequence(seq);
-    EXPECT\_CALL(to, ChangeBalance(sum)).InSequence(seq);
-    EXPECT\_CALL(to, GetBalance()).WillRepeatedly(Return(100));
-    EXPECT\_CALL(to, ChangeBalance(-sum)).InSequence(seq); // откат
-    EXPECT\_CALL(to, Unlock()).InSequence(seq);
-    EXPECT\_CALL(from, Unlock()).InSequence(seq);
-
-    EXPECT\_FALSE(tx.Make(from, to, sum));
-}
-
-TEST(Transaction, Make\_ExceptionRollback) {
-    MockAccount from(1,1000), to(2,500);
-    Transaction tx;
-    EXPECT\_CALL(from, Lock());
-    EXPECT\_CALL(to, Lock());
-    EXPECT\_CALL(to, ChangeBalance(200)).WillOnce(::testing::Throw(std::runtime\_error("")));
-    EXPECT\_CALL(to, Unlock());
-    EXPECT\_CALL(from, Unlock());
-    EXPECT\_THROW(tx.Make(from, to, 200), std::runtime\_error);
-}
-EOF
-```
-
-Тестирование с моками
-
-```bash
-cat > .github/workflows/ci.yml << EOF
-name: CI
-
-on: \[push, pull\_request]
+on:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
-  coverage:
+  build-and-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install gcovr
-        run: sudo apt update \&\& sudo apt install -y gcovr
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential rpm
 
-      - name: Configure CMake with coverage
-        run: |
-          rm -rf build
-          cmake -B build -DENABLE\_COVERAGE=ON
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build
 
-      - name: Run tests
-        run: cd build \&\& ctest --output-on-failure
+      - name: Package TGZ
+        run: cd build && cpack -G TGZ
 
-      - name: Generate coverage report (cobertura)
-        run: |
-          cd build
-          gcovr --gcov-executable gcov --root .. --cobertura --output coverage.xml
+      - name: Package DEB
+        run: cd build && cpack -G DEB
 
-      - name: Upload to Coveralls
-        uses: coverallsapp/github-action@v2
+      - name: Package RPM
+        run: cd build && cpack -G RPM
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
         with:
-          github-token: \\${{ secrets.GITHUB\_TOKEN }}
-          file: build/coverage.xml
-          format: cobertura
+          files: build/*.tar.gz build/*.deb build/*.rpm
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 EOF
 ```
 
-Создан .yml. Это финальная версия, которая получилась при решении ошибок на гитхабе
+*Добавим и запушим workflow:*
 
 ```bash
-mkdir build
-cd build
-cmake -DENABLE\_COVERAGE=ON ..
-make
+git add .github/workflows/cpack.yml
+git commit -m "Добавлен GitHub Actions для автоматической сборки пакетов CPack"
+git push origin main
 ```
 
-Сборка CMakeLists
+##Homework
 
-```bash
-ctest
-```
+В рамках домашнего задания настроена автоматическая генерация пакетов (.tar.gz, .deb, .rpm, .dmg) при создании тега, а также их публикация в релизах GitHub. Конфигурация CPack позволяет легко расширить набор пакетов.
 
-Проведён тест, успешно.
+### Результаты
 
-Вывод:
+-Созданы пакеты .tar.gz, .deb, .rpm (и .dmg на macOS).
+-Теги v0.1.0.0 и v0.1.0.1 присутствуют в репозитории.
+-Релизы на GitHub созданы (вручную для первых двух тегов, автоматически для последующих).
+-Настроен CI (GitHub Actions), который по тегу собирает пакеты и создаёт релиз.
 
-```
-Test project /home/vboxuser/wat2344/workspace/projects/PTAM-lab05/build
-    Start 1: BankingTests
-1/1 Test #1: BankingTests .....................   Passed    0.00 sec
+### Вывод
 
-100% tests passed, 0 tests failed out of 1
-
-Total Test time (real) =   0.01 sec
-```
-
-Далее шла настройка Coveralls. Там возникало много ошибок при сборке, но по итогу Coveralls показал репозиторий
-
-```
-
+В ходе лабораторной работы освоены возможности CPack для упаковки C++ проектов в различные форматы, а также интеграция с Git и GitHub Actions для автоматического выпуска релизов. Это позволяет упростить распространение библиотеки или приложения в виде готовых бинарных пакетов.
