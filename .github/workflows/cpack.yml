@@ -1,3 +1,4 @@
+
 name: CPack
 
 on:
@@ -6,7 +7,7 @@ on:
       - 'v*'
 
 jobs:
-  build-linux:
+  build-and-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,52 +30,9 @@ jobs:
       - name: Package RPM
         run: cd build && cpack -G RPM
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-packages
-          path: build/*.tar.gz build/*.deb build/*.rpm
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: brew install cmake
-
-      - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build
-
-      - name: Package TGZ
-        run: cd build && cpack -G TGZ
-
-      - name: Package DMG
-        run: cd build && cpack -G DragNDrop || echo "DMG generation skipped if not supported"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-packages
-          path: build/*.tar.gz build/*.dmg
-
-  release:
-    needs: [build-linux, build-macos]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: List files
-        run: ls -la artifacts/*
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/**/*
+          files: build/*.tar.gz build/*.deb build/*.rpm
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
