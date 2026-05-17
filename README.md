@@ -108,9 +108,9 @@ EOF
 cmake -H. -B_build
 cmake --build _build
 cd _build
-cpack -G "TGZ"          # создание .tar.gz
-cpack -G "DEB"          # создание .deb (на Linux)
-cpack -G "RPM"          # создание .rpm (на Linux)
+cpack -G "TGZ"         
+cpack -G "DEB"          
+cpack -G "RPM"          
 cd ..
 ```
 
